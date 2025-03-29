@@ -9,8 +9,8 @@ import os
 from dotenv import load_dotenv
 import jwt
 from fastapi import Request
-
 from datetime import datetime, timedelta
+from bson.objectid import ObjectId
 
 load_dotenv()
 
@@ -30,6 +30,7 @@ app.add_middleware(
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client['hancluster']
 user_collection = db['users']
+profile_collection = db["profile"]
 
 # JWT setup
 SECRET_KEY = "your_secret_key"
@@ -121,10 +122,45 @@ async def insert_profile(request: Request):
         "login_id": profile_data.get("login_id")
     }
 
-    result = user_collection.update_one(
+    result = profile_collection.insert_one.update_one(
         {"login_id": insert_data["login_id"]},
         {"$set": insert_data},
         upsert=True
     )
 
     return {"message": "Profile inserted/updated", "login_id": insert_data["login_id"]}
+
+
+
+@app.get("/canvas/courses/save")
+def save_courses(token: str = Depends(oauth2_scheme)):
+    try:
+        canvas_data = get_canvas_data("/courses")
+        if not canvas_data:
+            raise HTTPException(status_code=404, detail="No courses found from Canvas API.")
+
+        course_collection = db["courses"]
+
+        for course in canvas_data:
+            record = {
+                "canvas_course_id": course.get("id"),
+                "name": course.get("name"),
+                "course_code": course.get("course_code"),
+                "start_at": datetime.fromisoformat(course["start_at"].replace("Z", "+00:00")) if course.get("start_at") else None,
+                "end_at": datetime.fromisoformat(course["end_at"].replace("Z", "+00:00")) if course.get("end_at") else None,
+                "term_id": course.get("enrollment_term_id"),
+                "calendar_ics": course.get("calendar", {}).get("ics"),
+                "uuid": course.get("uuid"),
+                "time_zone": course.get("time_zone")
+            }
+
+            course_collection.update_one(
+                {"canvas_course_id": course.get("id")},
+                {"$set": record},
+                upsert=True
+            )
+
+        return {"message": "Courses saved successfully", "count": len(canvas_data)}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
