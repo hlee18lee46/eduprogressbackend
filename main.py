@@ -8,7 +8,7 @@ import requests
 import os
 from dotenv import load_dotenv
 import jwt
-
+from fastapi import Request
 
 from datetime import datetime, timedelta
 
@@ -107,3 +107,24 @@ def get_courses():
 @app.get("/canvas/courses/{course_id}/assignments")
 def get_assignments(course_id: str):
     return get_canvas_data(f"/courses/{course_id}/assignments")
+
+
+
+@app.post("/canvas/profile/insert")
+async def insert_profile(request: Request):
+    profile_data = await request.json()
+
+    insert_data = {
+        "name": profile_data.get("name"),
+        "primary_email": profile_data.get("primary_email"),
+        "time_zone": profile_data.get("time_zone"),
+        "login_id": profile_data.get("login_id")
+    }
+
+    result = user_collection.update_one(
+        {"login_id": insert_data["login_id"]},
+        {"$set": insert_data},
+        upsert=True
+    )
+
+    return {"message": "Profile inserted/updated", "login_id": insert_data["login_id"]}
