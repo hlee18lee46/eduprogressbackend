@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 import google.generativeai as genai
 from openai import OpenAI
+from langchain.chat_models import ChatGoogleGenerativeAI
+from langchain.schema import HumanMessage, SystemMessage
 
 load_dotenv()
 
@@ -45,6 +47,13 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # Gemini API key
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-1.5-pro",
+    google_api_key=GEMINI_API_KEY,
+)
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
@@ -360,3 +369,24 @@ def chat_with_gpt(chat: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 app.include_router(router)
+
+
+@app.post("/chat_gemini")
+def chat_with_gemini(chat: ChatRequest):
+    try:
+        # Prompt setup
+        system_prompt = "You are an academic assistant. Answer clearly and helpfully to support learning."
+
+        # Use LangChain's message structure
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=chat.message)
+        ]
+
+        # Get reply
+        response = llm(messages)
+
+        return {"reply": response.content}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
