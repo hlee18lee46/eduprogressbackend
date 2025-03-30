@@ -330,33 +330,44 @@ def get_profile(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
 
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 class ChatRequest(BaseModel):
     message: str
 
-@app.post("/chat")
-async def chat_with_gemini(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
+@router.post("/chat")
+def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
     try:
-        # ✅ Decode token to get username
+        # Decode the token to get the username
         payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
         username = payload.get("sub")
         if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        # ✅ Initialize Gemini
-        model = genai.GenerativeModel("gemini-pro")
-
-        # ✅ Prompt setup
+        # Define system behavior
         system_prompt = (
-            "You are an academic assistant. Provide helpful, clear, and insightful answers to the user's query."
+            "You are an academic assistant. Answer clearly and helpfully to support learning."
         )
 
-        response = model.generate_content([
-            {"role": "system", "parts": [system_prompt]},
-            {"role": "user", "parts": [chat.message]}
-        ])
+        # GPT-3.5-turbo chat completion
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": chat.message}
+            ]
+        )
 
-        reply = response.text
+        reply = response.choices[0].message["content"]
+
+        # Optional: store chat in MongoDB
+        chat_collection.insert_one({
+            "username": username,
+            "question": chat.message,
+            "response": reply
+        })
+
         return {"reply": reply}
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
