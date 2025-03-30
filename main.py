@@ -202,3 +202,26 @@ def delete_all_courses(token: str = Depends(oauth2_scheme)):
     return {
         "message": f"Deleted {result.deleted_count} courses for user '{username}'."
     }
+
+from fastapi import Depends, HTTPException
+from bson.json_util import dumps
+from bson.objectid import ObjectId
+
+@app.get("/profile")
+def get_profile(token: str = Depends(oauth2_scheme)):
+    try:
+        # Decode JWT token to get username
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Look for user profile using login_id (which should match the username)
+        profile = db["profile"].find_one({"login_id": username}, {"_id": 0})
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+
+        return profile
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
