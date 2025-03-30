@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 import jwt
 from fastapi import Request
 from datetime import datetime, timedelta
-from bson.objectid import ObjectId
 from openai import OpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -387,3 +386,46 @@ def chat_with_gemini(chat: ChatRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
+
+@app.get("/canvas/courses/{course_id}/assignments/save")
+def save_assignments(course_id: str, token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Fetch assignments from Canvas
+        headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
+        url = f"{BASE_URL}/api/v1/courses/{course_id}/assignments"
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch assignments")
+
+        assignments = response.json()
+        assignment_collection = db["assignments"]
+
+        for assignment in assignments:
+            assignment_doc = {
+                "username": username,
+                "canvas_course_id": course_id,
+                "assignment_id": assignment.get("id"),
+                "name": assignment.get("name"),
+                "due_at": assignment.get("due_at"),
+                "points_possible": assignment.get("points_possible"),
+                "submission_types": assignment.get("submission_types"),
+                "grading_type": assignment.get("grading_type"),
+                "description": assignment.get("description"),
+            }
+
+            # Upsert each assignment
+            assignment_collection.update_one(
+                {"assignment_id": assignment.get("id"), "username": username},
+                {"$set": assignment_doc},
+                upsert=True
+            )
+
+        return {"message": "Assignments saved successfully", "count": len(assignments)}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
