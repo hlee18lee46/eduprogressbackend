@@ -40,6 +40,9 @@ user_collection = db['users']
 profile_collection = db["profile"]
 chat_collection = db["chats"]
 quiz_collection = db["quizzes"]
+assignment_collection = db["assignments"]
+quiz_result_collection = db["quiz_result"]
+
 # JWT setup
 SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
