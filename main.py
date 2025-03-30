@@ -12,6 +12,7 @@ from fastapi import Request
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 import google.generativeai as genai
+from openai import OpenAI
 
 load_dotenv()
 
