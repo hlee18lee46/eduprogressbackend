@@ -368,7 +368,7 @@ def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
             "response": reply
         })
 
-        return {"reply": reply}
+        return {"reply": response.choices[0].message.content}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
