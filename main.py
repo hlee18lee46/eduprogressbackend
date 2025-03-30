@@ -387,7 +387,7 @@ def chat_with_gemini(chat: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini error: {str(e)}")
 
-@app.get("/canvas/courses/{course_id}/assignments/save")
+@app.get("/canvas/courses/{course_id}/assignments/save2")
 def save_assignments(course_id: str, token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -429,3 +429,46 @@ def save_assignments(course_id: str, token: str = Depends(oauth2_scheme)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    
+@app.get("/canvas/courses/{course_id}/assignments/save")
+def save_and_return_assignments(course_id: int, token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Fetch from Canvas API
+        endpoint = f"/courses/{course_id}/assignments"
+        assignments_data = get_canvas_data(endpoint)
+
+        assignment_collection = db["assignments"]
+        saved_assignments = []
+
+        for item in assignments_data:
+            assignment = {
+                "username": username,
+                "canvas_course_id": course_id,
+                "name": item.get("name"),
+                "due_at": item.get("due_at"),
+                "points_possible": item.get("points_possible"),
+                "grade": item.get("grade"),  # If available
+            }
+            assignment_collection.update_one(
+                {
+                    "username": username,
+                    "canvas_course_id": course_id,
+                    "name": item.get("name"),
+                },
+                {"$set": assignment},
+                upsert=True
+            )
+            saved_assignments.append(assignment)
+
+        return {
+            "message": "Assignments saved successfully",
+            "assignments": saved_assignments
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save assignments: {str(e)}")
