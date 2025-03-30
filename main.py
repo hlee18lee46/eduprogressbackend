@@ -359,7 +359,7 @@ def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
             ]
         )
 
-        reply = response.choices[0].message["content"]
+        reply = response.choices[0].message.content
 
         # Optional: store chat in MongoDB
         chat_collection.insert_one({
