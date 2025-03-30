@@ -372,3 +372,6 @@ def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    
+        # ✅ Add this to activate the chat route
+app.include_router(router)
