@@ -39,7 +39,7 @@ db = client['hancluster']
 user_collection = db['users']
 profile_collection = db["profile"]
 chat_collection = db["chats"]
-
+quiz_collection = db["quizzes"]
 # JWT setup
 SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
@@ -518,3 +518,11 @@ def save_and_return_assignments(course_id: int, token: str = Depends(oauth2_sche
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save assignments: {str(e)}")
+    
+@app.get("/quizzes")
+def get_quizzes():
+    try:
+        quizzes = list(quiz_collection.find({}, {"_id": 0}))
+        return {"quizzes": quizzes}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching quizzes: {str(e)}")
