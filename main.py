@@ -359,3 +359,4 @@ def chat_with_gpt(chat: ChatRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+app.include_router(router)
