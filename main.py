@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import APIRouter, FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
@@ -29,7 +29,7 @@ app.add_middleware(
 )
 
 
-
+router = APIRouter()
 
 
 # MongoDB setup
@@ -331,7 +331,7 @@ def get_profile(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class ChatRequest(BaseModel):
     message: str
@@ -351,7 +351,7 @@ def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
         )
 
         # GPT-3.5-turbo chat completion
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_prompt},
