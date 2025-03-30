@@ -66,16 +66,77 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes
 async def register(user: User):
     if user_collection.find_one({"username": user.username}):
         raise HTTPException(status_code=400, detail="Username already exists")
+
     hashed_password = get_password_hash(user.password)
-    hashed_access_token = get_password_hash(user.access_token)
-    user_data = {
+    hashed_token = get_password_hash(user.access_token)
+
+    # Insert user into the users collection
+    user_collection.insert_one({
         "username": user.username,
         "password": hashed_password,
         "canvas_base_url": user.canvas_base_url,
-        "access_token": hashed_access_token
-    }
-    user_collection.insert_one(user_data)
-    return {"message": "User registered successfully"}
+        "access_token": hashed_token,
+    })
+
+    # Store raw Canvas credentials temporarily to fetch data
+    BASE_URL = user.canvas_base_url
+    ACCESS_TOKEN = user.access_token
+    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
+
+    try:
+        # ✅ 1. Fetch and store profile
+        profile_url = f"{BASE_URL}/api/v1/users/self/profile"
+        profile_resp = requests.get(profile_url, headers=headers)
+        profile_data = profile_resp.json()
+
+        if profile_resp.status_code != 200:
+            raise HTTPException(status_code=profile_resp.status_code, detail="Failed to fetch profile")
+
+        profile_doc = {
+            "login_id": user.username,
+            "name": profile_data.get("name"),
+            "primary_email": profile_data.get("primary_email"),
+            "time_zone": profile_data.get("time_zone"),
+        }
+        db["profile"].update_one(
+            {"login_id": user.username},
+            {"$set": profile_doc},
+            upsert=True
+        )
+
+        # ✅ 2. Fetch and store courses
+        course_url = f"{BASE_URL}/api/v1/courses"
+        course_resp = requests.get(course_url, headers=headers)
+        course_data = course_resp.json()
+
+        if course_resp.status_code != 200:
+            raise HTTPException(status_code=course_resp.status_code, detail="Failed to fetch courses")
+
+        for course in course_data:
+            course_doc = {
+                "username": user.username,
+                "canvas_course_id": course.get("id"),
+                "name": course.get("name"),
+                "course_code": course.get("course_code"),
+                "start_at": datetime.fromisoformat(course["start_at"].replace("Z", "+00:00")) if course.get("start_at") else None,
+                "end_at": datetime.fromisoformat(course["end_at"].replace("Z", "+00:00")) if course.get("end_at") else None,
+                "term_id": course.get("enrollment_term_id"),
+                "calendar_ics": course.get("calendar", {}).get("ics"),
+                "uuid": course.get("uuid"),
+                "time_zone": course.get("time_zone")
+            }
+
+            db["courses"].update_one(
+                {"canvas_course_id": course.get("id"), "username": user.username},
+                {"$set": course_doc},
+                upsert=True
+            )
+
+        return {"message": "User registered and Canvas data saved successfully"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error during Canvas sync: {str(e)}")
+
 
 @app.post("/register2")
 async def register(user: User):
