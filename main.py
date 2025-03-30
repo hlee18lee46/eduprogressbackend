@@ -122,13 +122,19 @@ async def insert_profile(request: Request):
         "login_id": profile_data.get("login_id")
     }
 
-    result = profile_collection.insert_one.update_one(
-        {"login_id": insert_data["login_id"]},
-        {"$set": insert_data},
-        upsert=True
+    result = profile_collection.update_one(
+        {"login_id": insert_data["login_id"]},  # filter
+        {"$set": insert_data},                  # update operation
+        upsert=True                             # insert if not found
     )
 
-    return {"message": "Profile inserted/updated", "login_id": insert_data["login_id"]}
+    return {
+        "message": "Profile inserted or updated",
+        "login_id": insert_data["login_id"],
+        "matched_count": result.matched_count,
+        "modified_count": result.modified_count,
+        "upserted_id": str(result.upserted_id) if result.upserted_id else None
+    }
 
 
 
