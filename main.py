@@ -11,6 +11,7 @@ import jwt
 from fastapi import Request
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
+import google.generativeai as genai
 
 load_dotenv()
 
@@ -35,11 +36,14 @@ client = MongoClient(os.getenv("MONGO_URI"))
 db = client['hancluster']
 user_collection = db['users']
 profile_collection = db["profile"]
+chat_collection = db["chats"]
 
 # JWT setup
 SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Gemini API key
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
@@ -324,3 +328,47 @@ def get_profile(token: str = Depends(oauth2_scheme)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+    
+
+    # Model
+class ChatRequest(BaseModel):
+    message: str
+
+# Endpoint
+@app.post("/chat")
+async def chat_with_gemini(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
+    try:
+        # Get username from token
+        import jwt
+        payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Initialize Gemini model
+        model = genai.GenerativeModel("gemini-pro")
+
+        # Create conversation prompt
+        system_prompt = (
+            f"You are an academic assistant. Provide helpful, clear, and insightful answers to the user's query."
+        )
+
+        response = model.generate_content([
+            {"role": "system", "parts": [system_prompt]},
+            {"role": "user", "parts": [chat.message]}
+        ])
+
+        # Extract reply
+        reply = response.text
+
+        # Optionally store chat history
+        chat_collection.insert_one({
+            "username": username,
+            "question": chat.message,
+            "response": reply
+        })
+
+        return {"reply": reply}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chatbot error: {str(e)}")
