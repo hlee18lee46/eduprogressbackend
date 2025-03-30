@@ -337,14 +337,8 @@ class ChatRequest(BaseModel):
     message: str
 
 @router.post("/chat")
-def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
+def chat_with_gpt(chat: ChatRequest):
     try:
-        # Decode the token to get the username
-        payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
-        username = payload.get("sub")
-        if not username:
-            raise HTTPException(status_code=401, detail="Invalid token")
-
         # Define system behavior
         system_prompt = (
             "You are an academic assistant. Answer clearly and helpfully to support learning."
@@ -359,19 +353,9 @@ def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
             ]
         )
 
-        reply = response.choices[0].message.content  # ✅ Correct way to get reply
-
-        # Optional: store chat in MongoDB
-        chat_collection.insert_one({
-            "username": username,
-            "question": chat.message,
-            "response": reply
-        })
+        reply = response.choices[0].message.content
 
         return {"reply": reply}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-
-# ✅ Make sure this is added at the bottom of your main.py
-app.include_router(router)
