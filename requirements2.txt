@@ -10,7 +10,6 @@ cryptography==44.0.2
 dnspython==2.7.0
 ecdsa==0.19.1
 fastapi==0.115.12
-google-ai-generativelanguage==0.6.16
 google-api-core==2.24.2
 google-api-python-client==2.166.0
 google-auth==2.38.0
