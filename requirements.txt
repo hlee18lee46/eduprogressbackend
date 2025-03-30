@@ -49,3 +49,16 @@ uritemplate==4.1.1
 urllib3==2.3.0
 uvicorn==0.34.0
 openai==1.66.3
+langchain==0.3.20
+langchain-community==0.3.19
+langchain-core==0.3.44
+langchain-google==0.1.1
+langchain-google-genai==2.0.11
+langchain-text-splitters==0.3.6
+langsmith==0.3.13
+google-ai-generativelanguage==0.6.16
+google-api-core==2.24.2
+google-api-python-client==2.163.0
+google-auth==2.38.0
+google-auth-httplib2==0.2.0
+googleapis-common-protos==1.69.1
