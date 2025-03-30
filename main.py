@@ -111,30 +111,47 @@ def get_assignments(course_id: str):
 
 
 
+# Dependency to get the current user
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    return username
+
 @app.post("/canvas/profile/insert")
-async def insert_profile(request: Request):
+async def insert_profile(request: Request, current_user: str = Depends(get_current_user)):
     profile_data = await request.json()
 
     insert_data = {
         "name": profile_data.get("name"),
         "primary_email": profile_data.get("primary_email"),
         "time_zone": profile_data.get("time_zone"),
-        "login_id": profile_data.get("login_id")
+        "login_id": current_user  # Use the username from the JWT token
     }
 
     result = profile_collection.update_one(
-        {"login_id": insert_data["login_id"]},  # filter
-        {"$set": insert_data},                  # update operation
-        upsert=True                             # insert if not found
+        {"login_id": current_user},  # filter by the authenticated user's username
+        {"$set": insert_data},       # update operation
+        upsert=True                  # insert if not found
     )
 
     return {
         "message": "Profile inserted or updated",
-        "login_id": insert_data["login_id"],
+        "login_id": current_user,
         "matched_count": result.matched_count,
         "modified_count": result.modified_count,
         "upserted_id": str(result.upserted_id) if result.upserted_id else None
     }
+
 
 
 
