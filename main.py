@@ -390,16 +390,6 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class ChatRequest(BaseModel):
     message: str
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        if not username:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return username
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
 @router.post("/chat")
 def chat_with_gpt(chat: ChatRequest, username: str = Depends(get_current_user)):
     try:
@@ -479,16 +469,18 @@ app.include_router(router)
 @app.post("/chat_gemini")
 def chat_with_gemini(chat: ChatRequest):
     try:
-        # Prompt setup
-        system_prompt = "You are an academic assistant. Answer clearly and helpfully to support learning."
+        # Updated system prompt with context about quiz results
+        system_prompt = (
+            "You are an academic assistant. A student has just completed a quiz and wants feedback. "
+            "Based on the score and any incorrect answers they provide, give constructive feedback, "
+            "highlight weak areas, and suggest how to improve learning outcomes clearly and helpfully."
+        )
 
-        # Use LangChain's message structure
         messages = [
             SystemMessage(content=system_prompt),
-            HumanMessage(content=chat.message)
+            HumanMessage(content=chat.message)  # contains quiz results and possibly incorrect answers
         ]
 
-        # Get reply
         response = llm(messages)
 
         return {"reply": response.content}
