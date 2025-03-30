@@ -12,7 +12,8 @@ from fastapi import Request
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 from openai import OpenAI
-from langchain.chat_models import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from langchain.schema import HumanMessage, SystemMessage
 
 load_dotenv()
