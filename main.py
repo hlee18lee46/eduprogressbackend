@@ -330,27 +330,24 @@ def get_profile(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
     
 
-    # Model
 class ChatRequest(BaseModel):
     message: str
 
-# Endpoint
 @app.post("/chat")
 async def chat_with_gemini(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
     try:
-        # Get username from token
-        import jwt
+        # ✅ Decode token to get username
         payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
         username = payload.get("sub")
         if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        # Initialize Gemini model
+        # ✅ Initialize Gemini
         model = genai.GenerativeModel("gemini-pro")
 
-        # Create conversation prompt
+        # ✅ Prompt setup
         system_prompt = (
-            f"You are an academic assistant. Provide helpful, clear, and insightful answers to the user's query."
+            "You are an academic assistant. Provide helpful, clear, and insightful answers to the user's query."
         )
 
         response = model.generate_content([
@@ -358,16 +355,7 @@ async def chat_with_gemini(chat: ChatRequest, token: str = Depends(oauth2_scheme
             {"role": "user", "parts": [chat.message]}
         ])
 
-        # Extract reply
         reply = response.text
-
-        # Optionally store chat history
-        chat_collection.insert_one({
-            "username": username,
-            "question": chat.message,
-            "response": reply
-        })
-
         return {"reply": reply}
 
     except Exception as e:
