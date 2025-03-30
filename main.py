@@ -359,7 +359,7 @@ def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
             ]
         )
 
-        reply = response.choices[0].message.content
+        reply = response.choices[0].message.content  # ✅ Correct way to get reply
 
         # Optional: store chat in MongoDB
         chat_collection.insert_one({
@@ -368,10 +368,10 @@ def chat_with_gpt(chat: ChatRequest, token: str = Depends(oauth2_scheme)):
             "response": reply
         })
 
-        return {"reply": response.choices[0].message.content}
+        return {"reply": reply}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
-    
-        # ✅ Add this to activate the chat route
+
+# ✅ Make sure this is added at the bottom of your main.py
 app.include_router(router)
