@@ -387,7 +387,67 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 class ChatRequest(BaseModel):
     message: str
 
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return username
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
 @router.post("/chat")
+def chat_with_gpt(chat: ChatRequest, username: str = Depends(get_current_user)):
+    try:
+        # 🎯 Fetch upcoming assignments for this user
+        assignments = list(assignment_collection.find(
+            {"username": username},
+            {"_id": 0, "name": 1, "due_at": 1, "course_id": 1}
+        ))
+
+        # 📅 Parse and sort by due date (nearest upcoming first)
+        def parse_due_date(a):
+            try:
+                return datetime.fromisoformat(a["due_at"].replace("Z", "+00:00"))
+            except:
+                return datetime.max  # Push non-date items to the end
+
+        sorted_assignments = sorted(
+            [a for a in assignments if a.get("due_at")],
+            key=parse_due_date
+        )
+
+        # 🧾 Format assignments as bullet points
+        formatted_assignments = "\n".join([
+            f"- {a.get('name')} (Course ID: {a.get('course_id')}, Due: {a.get('due_at')})"
+            for a in sorted_assignments[:5]  # limit to 5 closest
+        ]) or "No upcoming assignments found."
+
+        # 🧠 System prompt with context
+        system_prompt = (
+            "You are an academic assistant. Your job is to support the student's learning.\n"
+            "Here are their upcoming assignments, sorted by due date:\n"
+            f"{formatted_assignments}\n\n"
+            "Answer the user's question based on this academic context when helpful."
+        )
+
+        # 🧠 Call OpenAI
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": chat.message}
+            ]
+        )
+
+        reply = response.choices[0].message.content
+        return {"reply": reply}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
+@router.post("/chat_backup")
 def chat_with_gpt(chat: ChatRequest):
     try:
         # Define system behavior
