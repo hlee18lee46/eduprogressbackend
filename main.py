@@ -141,6 +141,18 @@ async def insert_profile(request: Request):
 @app.get("/canvas/courses/save")
 def save_courses(token: str = Depends(oauth2_scheme)):
     try:
+        # Decode the token to get the username
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Check if user exists
+        user = user_collection.find_one({"username": username})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Fetch courses from Canvas
         canvas_data = get_canvas_data("/courses")
         if not canvas_data:
             raise HTTPException(status_code=404, detail="No courses found from Canvas API.")
@@ -157,16 +169,19 @@ def save_courses(token: str = Depends(oauth2_scheme)):
                 "term_id": course.get("enrollment_term_id"),
                 "calendar_ics": course.get("calendar", {}).get("ics"),
                 "uuid": course.get("uuid"),
-                "time_zone": course.get("time_zone")
+                "time_zone": course.get("time_zone"),
+                "username": username  # Link to the user
             }
 
             course_collection.update_one(
-                {"canvas_course_id": course.get("id")},
+                {"canvas_course_id": course.get("id"), "username": username},
                 {"$set": record},
                 upsert=True
             )
 
         return {"message": "Courses saved successfully", "count": len(canvas_data)}
 
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
