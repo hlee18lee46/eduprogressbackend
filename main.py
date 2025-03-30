@@ -46,7 +46,6 @@ SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 # Gemini API key
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 llm = ChatGoogleGenerativeAI(
@@ -317,8 +316,6 @@ def delete_all_courses(token: str = Depends(oauth2_scheme)):
     }
 
 from fastapi import Depends, HTTPException
-from bson.json_util import dumps
-from bson.objectid import ObjectId
 
 @app.get("/profile")
 def get_profile(token: str = Depends(oauth2_scheme)):
