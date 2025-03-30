@@ -141,18 +141,11 @@ async def insert_profile(request: Request):
 @app.get("/canvas/courses/save")
 def save_courses(token: str = Depends(oauth2_scheme)):
     try:
-        # Decode the token to get the username
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
 
-        # Check if user exists
-        user = user_collection.find_one({"username": username})
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Fetch courses from Canvas
         canvas_data = get_canvas_data("/courses")
         if not canvas_data:
             raise HTTPException(status_code=404, detail="No courses found from Canvas API.")
@@ -161,6 +154,7 @@ def save_courses(token: str = Depends(oauth2_scheme)):
 
         for course in canvas_data:
             record = {
+                "username": username,  # ✅ Store user's username
                 "canvas_course_id": course.get("id"),
                 "name": course.get("name"),
                 "course_code": course.get("course_code"),
@@ -169,8 +163,7 @@ def save_courses(token: str = Depends(oauth2_scheme)):
                 "term_id": course.get("enrollment_term_id"),
                 "calendar_ics": course.get("calendar", {}).get("ics"),
                 "uuid": course.get("uuid"),
-                "time_zone": course.get("time_zone"),
-                "username": username  # Link to the user
+                "time_zone": course.get("time_zone")
             }
 
             course_collection.update_one(
@@ -181,10 +174,9 @@ def save_courses(token: str = Depends(oauth2_scheme)):
 
         return {"message": "Courses saved successfully", "count": len(canvas_data)}
 
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/courses")
 def get_saved_courses(token: str = Depends(oauth2_scheme)):
@@ -196,3 +188,17 @@ def get_saved_courses(token: str = Depends(oauth2_scheme)):
     course_collection = db["courses"]
     courses = list(course_collection.find({"username": username}, {"_id": 0}))  # exclude _id
     return courses
+
+@app.delete("/courses/delete_all")
+def delete_all_courses(token: str = Depends(oauth2_scheme)):
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    username = payload.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    course_collection = db["courses"]
+    result = course_collection.delete_many({"username": username})
+
+    return {
+        "message": f"Deleted {result.deleted_count} courses for user '{username}'."
+    }
