@@ -406,16 +406,17 @@ def chat_with_gpt(chat: ChatRequest, username: str = Depends(get_current_user)):
             except:
                 return datetime.max  # Push non-date items to the end
 
-    from datetime import timezone
-    now = datetime.now(timezone.utc)
+        from datetime import timezone
 
-    sorted_assignments = sorted(
-        [
-            a for a in assignments
-            if a.get("due_at") and parse_due_date(a) >= now
-        ],
-        key=parse_due_date
-)
+        now = datetime.now(timezone.utc)
+
+        sorted_assignments = sorted(
+            [
+                a for a in assignments
+                if a.get("due_at") and parse_due_date(a) >= now
+            ],
+            key=parse_due_date
+        )
 
         # 🧾 Format assignments as bullet points
         formatted_assignments = "\n".join([
