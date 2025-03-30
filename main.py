@@ -185,3 +185,14 @@ def save_courses(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid token")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/courses")
+def get_saved_courses(token: str = Depends(oauth2_scheme)):
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    username = payload.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    course_collection = db["courses"]
+    courses = list(course_collection.find({"username": username}, {"_id": 0}))  # exclude _id
+    return courses
