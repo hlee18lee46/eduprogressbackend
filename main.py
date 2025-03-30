@@ -11,7 +11,6 @@ import jwt
 from fastapi import Request
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
-import google.generativeai as genai
 from openai import OpenAI
 from langchain.chat_models import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, SystemMessage
