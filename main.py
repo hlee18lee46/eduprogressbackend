@@ -163,6 +163,52 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     user = user_collection.find_one({"username": form_data.username})
     if not user or not verify_password(form_data.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    access_token = create_access_token(data={"sub": form_data.username})
+
+    # Fetch Canvas access token
+    canvas_token = user.get("access_token_raw")  # Store this in plain text or decrypt if hashed
+    canvas_base_url = user.get("canvas_base_url")
+    headers = {"Authorization": f"Bearer {canvas_token}"}
+
+    try:
+        # Fetch courses
+        course_resp = requests.get(f"{canvas_base_url}/api/v1/courses", headers=headers)
+        courses = course_resp.json()
+
+        for course in courses:
+            course_id = course["id"]
+            assignments_resp = requests.get(
+                f"{canvas_base_url}/api/v1/courses/{course_id}/assignments",
+                headers=headers
+            )
+            assignments = assignments_resp.json()
+            for assignment in assignments:
+                db["assignments"].update_one(
+                    {"id": assignment["id"], "username": user["username"]},
+                    {"$set": {
+                        "username": user["username"],
+                        "course_id": course_id,
+                        "name": assignment.get("name"),
+                        "due_at": assignment.get("due_at"),
+                        "points_possible": assignment.get("points_possible"),
+                        "description": assignment.get("description"),
+                        "submission_types": assignment.get("submission_types"),
+                        "grading_type": assignment.get("grading_type"),
+                    }},
+                    upsert=True
+                )
+
+    except Exception as e:
+        print(f"Error during assignment sync: {e}")
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/token2")
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = user_collection.find_one({"username": form_data.username})
+    if not user or not verify_password(form_data.password, user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token(data={"sub": form_data.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
