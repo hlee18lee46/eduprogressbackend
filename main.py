@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from pymongo import MongoClient
 from passlib.context import CryptContext
 import requests
@@ -26,6 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+
+
+
 # MongoDB setup
 client = MongoClient(os.getenv("MONGO_URI"))
 db = client['hancluster']
@@ -43,6 +47,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 class User(BaseModel):
     username: str
     password: str
+    canvas_base_url: str
+    access_token: str
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -57,6 +63,21 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 @app.post("/register")
+async def register(user: User):
+    if user_collection.find_one({"username": user.username}):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    hashed_password = get_password_hash(user.password)
+    hashed_access_token = get_password_hash(user.access_token)
+    user_data = {
+        "username": user.username,
+        "password": hashed_password,
+        "canvas_base_url": user.canvas_base_url,
+        "access_token": hashed_access_token
+    }
+    user_collection.insert_one(user_data)
+    return {"message": "User registered successfully"}
+
+@app.post("/register2")
 async def register(user: User):
     if user_collection.find_one({"username": user.username}):
         raise HTTPException(status_code=400, detail="Username already exists")
